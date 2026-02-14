@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pig Roundup</title>
+  <style>
+    html {
+      height: 100%;
+      height: -webkit-fill-available;
+    }
+
+    :root {
+      --sky: #8ecdf4;
+      --grass: #79c36a;
+      --fence: #a06a3b;
+      --barn-red: #be2b26;
+      --barn-dark: #8f1e1a;
+      --shadow: rgba(0, 0, 0, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Verdana", sans-serif;
+      background: linear-gradient(180deg, var(--sky) 0 34%, var(--grass) 34% 100%);
+      min-height: 100vh;
+      min-height: 100svh;
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
+      color: #1f2a1f;
+      overflow: hidden;
+    }
+
+    #game {
+      width: 100vw;
+      height: 100vh;
+      height: 100svh;
+      height: 100dvh;
+      height: var(--app-height, 100dvh);
+      border: 0;
+      border-radius: 0;
+      overflow: hidden;
+      position: relative;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 44px,
+          rgba(255, 255, 255, 0.05) 44px 46px
+        ),
+        linear-gradient(180deg, var(--sky) 0 28%, var(--grass) 28% 100%);
+    }
+
+    #fence {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 28%;
+      height: 18px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--fence) 0 28px,
+        #b87b49 28px 36px
+      );
+      border-top: 3px solid #85562e;
+      border-bottom: 3px solid #85562e;
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    #cloudLayer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 28%;
+      pointer-events: none;
+      z-index: 5;
+      overflow: hidden;
+    }
+
+    .cloud {
+      position: absolute;
+      width: var(--w, 160px);
+      height: calc(var(--w, 160px) * 0.36);
+      top: var(--y, 10%);
+      left: calc(var(--x, 0%) - 20%);
+      background: rgba(255, 255, 255, 0.78);
+      border-radius: 999px;
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.12));
+      animation: cloud-drift var(--dur, 70s) linear infinite;
+      animation-delay: var(--delay, 0s);
+    }
+
+    .cloud::before,
+    .cloud::after {
+      content: "";
+      position: absolute;
+      background: rgba(255, 255, 255, 0.82);
+      border-radius: 50%;
+    }
+
+    .cloud::before {
+      width: 44%;
+      height: 120%;
+      left: 10%;
+      top: -52%;
+    }
+
+    .cloud::after {
+      width: 36%;
+      height: 96%;
+      right: 12%;
+      top: -35%;
+    }
+
+    #hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.86);
+      border: 2px solid #6a4f35;
+      border-radius: 10px;
+      font-weight: 700;
+      z-index: 30;
+    }
+
+    #message {
+      position: absolute;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 35, 20, 0.82);
+      color: #f8fff8;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 220ms ease;
+      z-index: 35;
+      pointer-events: none;
+    }
+
+    #message.show {
+      opacity: 1;
+    }
+
+    #startOverlay {
+      position: absolute;
+      inset: 0;
+      z-index: 60;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, rgba(40, 64, 88, 0.4) 0%, rgba(26, 48, 29, 0.52) 100%);
+    }
+
+    #startCard {
+      background: rgba(255, 250, 241, 0.94);
+      border: 3px solid #6a4f35;
+      border-radius: 14px;
+      padding: 20px 22px;
+      text-align: center;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+      max-width: 320px;
+    }
+
+    #startTitle {
+      margin: 0 0 8px;
+      font-size: 1.5rem;
+      color: #2a1f15;
+    }
+
+    #startText {
+      margin: 0 0 14px;
+      color: #3a2e22;
+      line-height: 1.35;
+      font-size: 0.95rem;
+    }
+
+    #playButton {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: #2f7f3a;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 1rem;
+      padding: 10px 22px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1e5b28;
+      transition: transform 80ms ease;
+    }
+
+    #playButton:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #1e5b28;
+    }
+
+    #yardPen {
+      position: absolute;
+      width: 30%;
+      height: 72%;
+      right: 0;
+      bottom: 0;
+      border: 8px solid #7f5731;
+      border-radius: 0;
+      overflow: hidden;
+      z-index: 14;
+      background: linear-gradient(180deg, #73b965 0 100%);
+      box-shadow: inset 8px 0 14px rgba(0, 0, 0, 0.15);
+    }
+
+    #yardPen::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 40px,
+          rgba(75, 52, 30, 0.2) 40px 44px
+        ),
+        repeating-linear-gradient(
+          0deg,
+          transparent 0 40px,
+          rgba(75, 52, 30, 0.2) 40px 44px
+        );
+    }
+
+    #yardPenLabel {
+      position: absolute;
+      top: 6px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #2c1e11;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 20;
+      text-shadow: 0 1px rgba(255, 255, 255, 0.4);
+    }
+
+    #mudPatch {
+      position: absolute;
+      left: 24px;
+      bottom: 28px;
+      width: 210px;
+      height: 120px;
+      border-radius: 52% 48% 46% 54% / 48% 42% 58% 52%;
+      background:
+        radial-gradient(circle at 24% 35%, rgba(255, 255, 255, 0.1) 0 14%, transparent 15%),
+        radial-gradient(circle at 74% 55%, rgba(255, 255, 255, 0.08) 0 10%, transparent 11%),
+        linear-gradient(180deg, #8f633e 0 36%, #6a4327 100%);
+      border: 2px solid #5a3820;
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    #waterTrough {
+      position: absolute;
+      right: 22px;
+      bottom: 26px;
+      width: 145px;
+      height: 62px;
+      border-radius: 12px;
+      background: #775d43;
+      border: 3px solid #5a432e;
+      box-shadow: inset 0 2px rgba(255, 255, 255, 0.22);
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    #waterTrough::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      right: 7px;
+      top: 8px;
+      bottom: 8px;
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 22% 40%, rgba(255, 255, 255, 0.38) 0 12%, transparent 13%),
+        radial-gradient(circle at 64% 64%, rgba(255, 255, 255, 0.24) 0 9%, transparent 10%),
+        linear-gradient(180deg, #8ad7ff 0 100%);
+    }
+
+    .pig {
+      --tx: 0px;
+      --ty: 0px;
+      --scale: 1;
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 147px;
+      height: 98px;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 30% 28%, #ffd4e3 0 20%, transparent 21%),
+        linear-gradient(180deg, #f9b8d1 0 34%, #ef92b7 100%);
+      border: 2px solid #cb7d98;
+      box-shadow: 0 4px 6px var(--shadow);
+      cursor: grab;
+      z-index: 20;
+      transform: translate3d(var(--tx), var(--ty), 0) scale(var(--scale));
+      will-change: transform;
+      touch-action: none;
+    }
+
+    .pig .snout {
+      position: absolute;
+      right: -20px;
+      top: 17px;
+      width: 50px;
+      height: 36px;
+      border-radius: 10px;
+      background: #f9bdd2;
+      border: 2px solid #cb7d98;
+    }
+
+    .pig .snout::before,
+    .pig .snout::after {
+      content: "";
+      position: absolute;
+      top: 12px;
+      width: 5px;
+      height: 6px;
+      background: #a45a74;
+      border-radius: 2px;
+    }
+
+    .pig .snout::before {
+      left: 12px;
+    }
+
+    .pig .snout::after {
+      right: 12px;
+    }
+
+    .pig .eye {
+      position: absolute;
+      right: 30px;
+      top: 13px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #2a1d1f;
+    }
+
+    .pig .ear {
+      position: absolute;
+      left: 15px;
+      top: -14px;
+      width: 18px;
+      height: 18px;
+      border-radius: 3px 8px 2px 8px;
+      transform: rotate(18deg);
+      background: #f7a9c7;
+      border: 2px solid #cb7d98;
+      border-bottom: none;
+      border-right: none;
+    }
+
+    .pig .tail {
+      position: absolute;
+      left: -10px;
+      top: 27px;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #cb7d98;
+      border-left: none;
+      border-bottom: none;
+      border-radius: 0 8px 0 0;
+      transform: rotate(24deg);
+    }
+
+    .pig .leg {
+      position: absolute;
+      bottom: -8px;
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: #d47f9d;
+      border: 1px solid #b56482;
+      animation: trot 280ms linear infinite alternate;
+    }
+
+    .pig .leg.l1 { left: 18px; }
+    .pig .leg.l2 { left: 38px; }
+    .pig .leg.l3 { left: 60px; }
+    .pig .leg.l4 { left: 80px; }
+
+    .pig.dragging {
+      cursor: grabbing;
+      --scale: 1.08;
+      z-index: 40;
+    }
+
+    .pig.dragging .leg {
+      animation-duration: 90ms;
+    }
+
+    .pig.dragging .tail {
+      animation: tail-wag 90ms linear infinite alternate;
+    }
+
+    .pig.caught {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 260ms ease;
+    }
+
+    .corral-pig {
+      cursor: default;
+      pointer-events: none;
+      z-index: 16;
+    }
+
+    #instructions {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 2px solid #6a4f35;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      z-index: 30;
+      max-width: 350px;
+      line-height: 1.3;
+    }
+
+    @keyframes trot {
+      from { transform: translateY(0); }
+      to { transform: translateY(3px); }
+    }
+
+    @keyframes tail-wag {
+      from { transform: rotate(10deg); }
+      to { transform: rotate(52deg); }
+    }
+
+    @keyframes cloud-drift {
+      from { transform: translateX(-24%); }
+      to { transform: translateX(148vw); }
+    }
+
+    @media (max-width: 720px) {
+      #yardPen {
+        width: 30%;
+        height: 72%;
+        right: 0;
+        bottom: 0;
+      }
+
+      #mudPatch {
+        left: 14px;
+        bottom: 18px;
+        width: 130px;
+        height: 82px;
+      }
+
+      #waterTrough {
+        right: 12px;
+        bottom: 14px;
+        width: 102px;
+        height: 42px;
+      }
+
+      .pig {
+        width: 125px;
+        height: 83px;
+      }
+
+      .pig .leg.l1 { left: 14px; }
+      .pig .leg.l2 { left: 32px; }
+      .pig .leg.l3 { left: 50px; }
+      .pig .leg.l4 { left: 68px; }
+
+      #instructions {
+        max-width: 250px;
+        font-size: 0.82rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game" aria-label="Pig roundup game area">
+    <div id="cloudLayer" aria-hidden="true">
+      <div class="cloud" style="--w: 210px; --y: 8%; --x: 8%; --dur: 120s; --delay: -18s;"></div>
+      <div class="cloud" style="--w: 150px; --y: 17%; --x: 34%; --dur: 96s; --delay: -42s;"></div>
+      <div class="cloud" style="--w: 190px; --y: 5%; --x: 62%; --dur: 108s; --delay: -66s;"></div>
+      <div class="cloud" style="--w: 130px; --y: 21%; --x: 78%; --dur: 88s; --delay: -29s;"></div>
+      <div class="cloud" style="--w: 170px; --y: 12%; --x: 92%; --dur: 112s; --delay: -54s;"></div>
+    </div>
+    <div id="fence"></div>
+    <div id="hud">
+      <div id="roundLabel">Round: 1</div>
+      <div id="remainingLabel">Pigs Remaining: 0</div>
+    </div>
+    <div id="message" role="status" aria-live="polite"></div>
+    <div id="startOverlay">
+      <div id="startCard">
+        <h1 id="startTitle">Pig Roundup</h1>
+        <p id="startText">Drag every pig into the fenced pen before the round ends.</p>
+        <button id="playButton" type="button">Play Game</button>
+      </div>
+    </div>
+
+    <div id="yardPen" aria-label="Pig pen">
+      <div id="yardPenLabel">Fenced Pig Pen</div>
+      <div id="mudPatch" aria-hidden="true"></div>
+      <div id="waterTrough" aria-hidden="true"></div>
+    </div>
+
+    <div id="instructions">
+      Click and drag each pig into the fenced pen.<br>
+      Gather all pigs to start the next round.
+    </div>
+  </div>
+
+  <script>
+    const game = document.getElementById('game');
+    const yardPen = document.getElementById('yardPen');
+    const startOverlay = document.getElementById('startOverlay');
+    const playButton = document.getElementById('playButton');
+    const roundLabel = document.getElementById('roundLabel');
+    const remainingLabel = document.getElementById('remainingLabel');
+    const message = document.getElementById('message');
+
+    const state = {
+      round: 1,
+      pigs: [],
+      corralPigs: [],
+      started: false,
+      pigsRemaining: 0,
+      draggingPig: null,
+      dragOffsetX: 0,
+      dragOffsetY: 0,
+      nextPigId: 1,
+      animationFrame: null,
+      lastTimestamp: 0,
+      audioUnlocked: false,
+      oinkSamples: [],
+      lastOinkAt: 0
+    };
+
+    const OINK_URLS = [
+      'https://upload.wikimedia.org/wikipedia/commons/7/73/Mudchute_pig_1.ogg',
+      'https://upload.wikimedia.org/wikipedia/commons/4/4a/Mudchute_pig_2.ogg',
+      'https://upload.wikimedia.org/wikipedia/commons/6/65/Mudchute_pig_3.ogg'
+    ];
+
+    function showMessage(text, timeout = 1200) {
+      message.textContent = text;
+      message.classList.add('show');
+      clearTimeout(showMessage._timer);
+      showMessage._timer = setTimeout(() => {
+        message.classList.remove('show');
+      }, timeout);
+    }
+
+    function updateViewportHeight() {
+      document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+    }
+
+    function getFarmBounds() {
+      const rect = game.getBoundingClientRect();
+      const penBounds = getPenBounds();
+      return {
+        left: 8,
+        top: Math.max(70, rect.height * 0.28 + 18),
+        right: Math.max(120, penBounds.left - 8),
+        bottom: rect.height - 8
+      };
+    }
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function setPigRenderPosition(pig) {
+      pig.el.style.setProperty('--tx', `${pig.x}px`);
+      pig.el.style.setProperty('--ty', `${pig.y}px`);
+    }
+
+    function getRoundSpeedMultiplier() {
+      return 1 + (state.round - 1) * 0.12;
+    }
+
+    function normalizeAngle(angle) {
+      let value = angle;
+      while (value > Math.PI) value -= Math.PI * 2;
+      while (value < -Math.PI) value += Math.PI * 2;
+      return value;
+    }
+
+    function pickNewDirection(pig, forceLargeTurn = false) {
+      const turnRange = forceLargeTurn ? Math.PI : Math.PI * 0.65;
+      const minTurn = forceLargeTurn ? Math.PI * 0.25 : Math.PI * 0.1;
+      const sign = Math.random() < 0.5 ? -1 : 1;
+      const amount = randomInRange(minTurn, turnRange) * sign;
+      pig.heading = normalizeAngle(pig.heading + amount);
+      pig.walkTimer = randomInRange(1.2, 3.2);
+    }
+
+    function ensureAudio() {
+      if (state.oinkSamples.length > 0) {
+        return;
+      }
+
+      for (const url of OINK_URLS) {
+        for (let i = 0; i < 3; i += 1) {
+          const audio = new Audio(url);
+          audio.preload = 'auto';
+          audio.volume = 0.35;
+          state.oinkSamples.push(audio);
+        }
+      }
+    }
+
+    function unlockAudio() {
+      ensureAudio();
+      state.audioUnlocked = true;
+    }
+
+    function playOink(volume = 0.35) {
+      if (!state.audioUnlocked || state.oinkSamples.length === 0) return;
+
+      const nowMs = performance.now();
+      if (nowMs - state.lastOinkAt < 110) return;
+      state.lastOinkAt = nowMs;
+
+      const base =
+        state.oinkSamples.find((sample) => sample.paused || sample.ended) ||
+        state.oinkSamples[Math.floor(Math.random() * state.oinkSamples.length)];
+
+      const sample = base.paused || base.ended ? base : base.cloneNode(true);
+      sample.currentTime = 0;
+      sample.playbackRate = randomInRange(0.9, 1.12);
+      sample.volume = Math.min(1, volume * randomInRange(0.9, 1.08));
+      sample.play().catch(() => {});
+    }
+
+    function createPigMarkup() {
+      return [
+        '<span class="ear"></span>',
+        '<span class="tail"></span>',
+        '<span class="eye"></span>',
+        '<span class="snout"></span>',
+        '<span class="leg l1"></span>',
+        '<span class="leg l2"></span>',
+        '<span class="leg l3"></span>',
+        '<span class="leg l4"></span>'
+      ].join('');
+    }
+
+    function clearPen() {
+      for (const pig of state.corralPigs) {
+        pig.el.remove();
+      }
+      state.corralPigs = [];
+    }
+
+    function getPenBounds() {
+      const gameRect = game.getBoundingClientRect();
+      const penRect = yardPen.getBoundingClientRect();
+      return {
+        left: penRect.left - gameRect.left,
+        top: penRect.top - gameRect.top,
+        right: penRect.right - gameRect.left,
+        bottom: penRect.bottom - gameRect.top,
+        width: penRect.width,
+        height: penRect.height
+      };
+    }
+
+    function addPigToPen(sourcePig) {
+      const penPigEl = document.createElement('div');
+      penPigEl.className = 'pig corral-pig';
+      penPigEl.innerHTML = createPigMarkup();
+      game.appendChild(penPigEl);
+
+      const penBounds = getPenBounds();
+      const padding = 10;
+      const minX = penBounds.left + padding;
+      const maxX = penBounds.right - sourcePig.w - padding;
+      const minY = penBounds.top + 30;
+      const maxY = penBounds.bottom - sourcePig.h - padding;
+
+      const penPig = {
+        el: penPigEl,
+        x: randomInRange(minX, Math.max(minX + 1, maxX)),
+        y: randomInRange(minY, Math.max(minY + 1, maxY)),
+        w: sourcePig.w,
+        h: sourcePig.h,
+        heading: randomInRange(-Math.PI, Math.PI),
+        speed: 88,
+        walkTimer: randomInRange(1.1, 2.8),
+        speedJitter: randomInRange(0.9, 1.15)
+      };
+
+      setPigRenderPosition(penPig);
+      state.corralPigs.push(penPig);
+    }
+
+    function spawnRound() {
+      cleanupPigs();
+      clearPen();
+
+      const pigCount = 3 + state.round;
+      const farm = getFarmBounds();
+
+      for (let i = 0; i < pigCount; i += 1) {
+        const pigEl = document.createElement('div');
+        pigEl.className = 'pig';
+        pigEl.innerHTML = createPigMarkup();
+        pigEl.setAttribute('role', 'button');
+        pigEl.setAttribute('aria-label', `Pig ${state.nextPigId}`);
+
+        const pig = {
+          id: state.nextPigId,
+          el: pigEl,
+          x: 0,
+          y: 0,
+          baseSpeed: randomInRange(72, 154),
+          heading: randomInRange(-Math.PI, Math.PI),
+          speed: 0,
+          walkTimer: randomInRange(1.2, 3.2),
+          speedJitter: randomInRange(0.85, 1.2),
+          caught: false,
+          dragging: false,
+          w: 147,
+          h: 98
+        };
+
+        if (window.matchMedia('(max-width: 720px)').matches) {
+          pig.w = 125;
+          pig.h = 83;
+        }
+
+        pig.x = randomInRange(farm.left + 20, Math.max(farm.left + 21, farm.right - pig.w - 8));
+        pig.y = randomInRange(farm.top + 10, Math.max(farm.top + 11, farm.bottom - pig.h - 8));
+        pig.speed = pig.baseSpeed * getRoundSpeedMultiplier();
+
+        setPigRenderPosition(pig);
+
+        pigEl.addEventListener('pointerdown', (event) => beginDrag(event, pig));
+        game.appendChild(pigEl);
+        state.pigs.push(pig);
+        state.nextPigId += 1;
+      }
+
+      state.pigsRemaining = state.pigs.length;
+      updateHud();
+      showMessage(`Round ${state.round}: herd the pigs!`, 1400);
+    }
+
+    function cleanupPigs() {
+      for (const pig of state.pigs) {
+        pig.el.remove();
+      }
+      state.pigs = [];
+      state.draggingPig = null;
+    }
+
+    function updateHud() {
+      roundLabel.textContent = `Round: ${state.round}`;
+      remainingLabel.textContent = `Pigs Remaining: ${state.pigsRemaining}`;
+    }
+
+    function beginDrag(event, pig) {
+      if (!state.started) return;
+      if (pig.caught) return;
+
+      unlockAudio();
+      playOink(0.26);
+
+      state.draggingPig = pig;
+      pig.dragging = true;
+      pig.el.classList.add('dragging');
+
+      const pigRect = pig.el.getBoundingClientRect();
+      state.dragOffsetX = event.clientX - pigRect.left;
+      state.dragOffsetY = event.clientY - pigRect.top;
+
+      pig.el.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+
+    function moveDraggedPig(clientX, clientY) {
+      const pig = state.draggingPig;
+      if (!pig) return;
+
+      const gameRect = game.getBoundingClientRect();
+      const minX = 8;
+      const minY = Math.max(70, gameRect.height * 0.28 + 18);
+      const maxX = gameRect.width - pig.w - 8;
+      const maxY = gameRect.height - pig.h - 8;
+
+      let x = clientX - gameRect.left - state.dragOffsetX;
+      let y = clientY - gameRect.top - state.dragOffsetY;
+
+      x = Math.min(Math.max(x, minX), maxX);
+      y = Math.min(Math.max(y, minY), maxY);
+
+      pig.x = x;
+      pig.y = y;
+      setPigRenderPosition(pig);
+    }
+
+    function endDrag(event) {
+      const pig = state.draggingPig;
+      if (!pig) return;
+
+      pig.dragging = false;
+      pig.el.classList.remove('dragging');
+
+      if (event && pig.el.hasPointerCapture(event.pointerId)) {
+        pig.el.releasePointerCapture(event.pointerId);
+      }
+
+      if (isPigInPen(pig)) {
+        catchPig(pig);
+      }
+
+      state.draggingPig = null;
+    }
+
+    function isPigInPen(pig) {
+      const penBounds = getPenBounds();
+
+      const pigCenterX = pig.x + pig.w / 2;
+      const pigCenterY = pig.y + pig.h / 2;
+
+      return (
+        pigCenterX >= penBounds.left &&
+        pigCenterX <= penBounds.right &&
+        pigCenterY >= penBounds.top &&
+        pigCenterY <= penBounds.bottom
+      );
+    }
+
+    function catchPig(pig) {
+      if (pig.caught) return;
+
+      pig.caught = true;
+      pig.el.classList.add('caught');
+      state.pigsRemaining -= 1;
+      updateHud();
+
+      ensureAudio();
+      playOink(0.48);
+      addPigToPen(pig);
+
+      setTimeout(() => pig.el.remove(), 280);
+
+      if (state.pigsRemaining <= 0) {
+        finishRound();
+      }
+    }
+
+    function finishRound() {
+      showMessage(`Round ${state.round} complete!`, 1200);
+      state.round += 1;
+
+      setTimeout(() => {
+        spawnRound();
+      }, 1300);
+    }
+
+    function updatePigs(dt) {
+      const farm = getFarmBounds();
+
+      for (const pig of state.pigs) {
+        if (pig.caught || pig.dragging) {
+          continue;
+        }
+
+        pig.walkTimer -= dt;
+        if (pig.walkTimer <= 0) {
+          pickNewDirection(pig);
+        }
+
+        pig.speed = pig.baseSpeed * getRoundSpeedMultiplier();
+
+        pig.heading += randomInRange(-0.35, 0.35) * dt;
+
+        pig.x += Math.cos(pig.heading) * pig.speed * pig.speedJitter * dt;
+        pig.y += Math.sin(pig.heading) * pig.speed * pig.speedJitter * dt;
+
+        let bounced = false;
+        let bouncedX = false;
+        let bouncedY = false;
+
+        if (pig.x <= farm.left) {
+          pig.x = farm.left;
+          bounced = true;
+          bouncedX = true;
+        } else if (pig.x + pig.w >= farm.right) {
+          pig.x = farm.right - pig.w;
+          bounced = true;
+          bouncedX = true;
+        }
+
+        if (pig.y <= farm.top) {
+          pig.y = farm.top;
+          bounced = true;
+          bouncedY = true;
+        } else if (pig.y + pig.h >= farm.bottom) {
+          pig.y = farm.bottom - pig.h;
+          bounced = true;
+          bouncedY = true;
+        }
+
+        if (bouncedX) {
+          pig.heading = Math.PI - pig.heading;
+        }
+        if (bouncedY) {
+          pig.heading = -pig.heading;
+        }
+        pig.heading = normalizeAngle(pig.heading);
+
+        if (bounced) {
+          pickNewDirection(pig, true);
+        } else if (Math.random() < 0.3 * dt) {
+          pickNewDirection(pig);
+        }
+
+        if ((bounced && Math.random() < 0.24) || Math.random() < 0.0016) {
+          playOink(0.2);
+        }
+
+        setPigRenderPosition(pig);
+      }
+    }
+
+    function updatePenPigs(dt) {
+      const penBounds = getPenBounds();
+      const pad = 10;
+      const topPad = 30;
+
+      for (const pig of state.corralPigs) {
+        pig.walkTimer -= dt;
+        if (pig.walkTimer <= 0) {
+          pickNewDirection(pig);
+        }
+
+        pig.heading += randomInRange(-0.3, 0.3) * dt;
+        pig.x += Math.cos(pig.heading) * pig.speed * pig.speedJitter * dt;
+        pig.y += Math.sin(pig.heading) * pig.speed * pig.speedJitter * dt;
+
+        let bounced = false;
+        let bouncedX = false;
+        let bouncedY = false;
+
+        if (pig.x <= penBounds.left + pad) {
+          pig.x = penBounds.left + pad;
+          bounced = true;
+          bouncedX = true;
+        } else if (pig.x + pig.w >= penBounds.right - pad) {
+          pig.x = penBounds.right - pig.w - pad;
+          bounced = true;
+          bouncedX = true;
+        }
+
+        if (pig.y <= penBounds.top + topPad) {
+          pig.y = penBounds.top + topPad;
+          bounced = true;
+          bouncedY = true;
+        } else if (pig.y + pig.h >= penBounds.bottom - pad) {
+          pig.y = penBounds.bottom - pig.h - pad;
+          bounced = true;
+          bouncedY = true;
+        }
+
+        if (bouncedX) {
+          pig.heading = Math.PI - pig.heading;
+        }
+        if (bouncedY) {
+          pig.heading = -pig.heading;
+        }
+        pig.heading = normalizeAngle(pig.heading);
+
+        if (bounced) {
+          pickNewDirection(pig, true);
+        }
+
+        setPigRenderPosition(pig);
+      }
+    }
+
+    function gameLoop(timestamp) {
+      if (!state.started) return;
+      if (!state.lastTimestamp) {
+        state.lastTimestamp = timestamp;
+      }
+
+      const dt = Math.min((timestamp - state.lastTimestamp) / 1000, 0.033);
+      state.lastTimestamp = timestamp;
+
+      updatePigs(dt);
+      updatePenPigs(dt);
+      state.animationFrame = requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      if (state.started) return;
+      state.started = true;
+      state.lastTimestamp = 0;
+      unlockAudio();
+      startOverlay.style.display = 'none';
+      spawnRound();
+      state.animationFrame = requestAnimationFrame(gameLoop);
+    }
+
+    game.addEventListener('pointermove', (event) => {
+      if (state.draggingPig) {
+        moveDraggedPig(event.clientX, event.clientY);
+      }
+    });
+
+    game.addEventListener('pointerup', (event) => endDrag(event));
+    game.addEventListener('pointercancel', (event) => endDrag(event));
+
+    window.addEventListener('resize', () => {
+      updateViewportHeight();
+      const farm = getFarmBounds();
+      const penBounds = getPenBounds();
+      for (const pig of state.pigs) {
+        pig.x = Math.min(Math.max(pig.x, farm.left), farm.right - pig.w);
+        pig.y = Math.min(Math.max(pig.y, farm.top), farm.bottom - pig.h);
+        setPigRenderPosition(pig);
+      }
+      for (const pig of state.corralPigs) {
+        pig.x = Math.min(Math.max(pig.x, penBounds.left + 10), penBounds.right - pig.w - 10);
+        pig.y = Math.min(Math.max(pig.y, penBounds.top + 30), penBounds.bottom - pig.h - 10);
+        setPigRenderPosition(pig);
+      }
+    });
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+    }
+
+    playButton.addEventListener('click', startGame);
+    updateViewportHeight();
+  </script>
+</body>
+</html>
